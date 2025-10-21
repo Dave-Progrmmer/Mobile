@@ -11,7 +11,6 @@ import {
   Alert,
   Modal,
   TextInput,
-  Switch,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -23,9 +22,8 @@ export default function PrayersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [message, setMessage] = useState('');
+  const [fromName, setFromName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -35,39 +33,37 @@ export default function PrayersScreen() {
   const loadPrayers = async () => {
     try {
       const data = await prayersAPI.getAll();
-      setPrayers(data.prayers);
+      setPrayers(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to load prayer requests');
+      // If user is not admin, try to get own prayers
+      try {
+        const myPrayers = await prayersAPI.getMyPrayers();
+        setPrayers(Array.isArray(myPrayers) ? myPrayers : []);
+      } catch (err) {
+        console.error('Error loading prayers:', err);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const handlePray = async (prayerId: string) => {
-    try {
-      await prayersAPI.addPrayer(prayerId);
-      Alert.alert('Success', 'You prayed for this request');
-      loadPrayers();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to add prayer');
-    }
-  };
-
   const handleSubmit = async () => {
-    if (!title || !description) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!message) {
+      Alert.alert('Error', 'Please enter your prayer request');
       return;
     }
 
     setSubmitting(true);
     try {
-      await prayersAPI.create({ title, description, isAnonymous });
+      await prayersAPI.create({ 
+        message, 
+        fromName: fromName || 'Anonymous' 
+      });
       Alert.alert('Success', 'Prayer request submitted');
       setModalVisible(false);
-      setTitle('');
-      setDescription('');
-      setIsAnonymous(false);
+      setMessage('');
+      setFromName('');
       loadPrayers();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to submit prayer request');
@@ -79,33 +75,32 @@ export default function PrayersScreen() {
   const renderPrayer = ({ item }: { item: any }) => (
     <View style={styles.prayerCard}>
       <View style={styles.prayerHeader}>
-        <Text style={styles.prayerTitle}>{item.title}</Text>
-        <View style={styles.prayerBadge}>
-          <Text style={styles.prayerBadgeText}>
-            {item.status || 'Pending'}
+        <View style={styles.prayerHeaderLeft}>
+          <Ionicons 
+            name={item.answered ? 'checkmark-circle' : 'heart'} 
+            size={24} 
+            color={item.answered ? '#10b981' : '#6366f1'} 
+          />
+          <Text style={styles.prayerAuthor}>
+            {item.fromName || 'Anonymous'}
           </Text>
         </View>
+        {item.answered && (
+          <View style={styles.answeredBadge}>
+            <Text style={styles.answeredText}>Answered</Text>
+          </View>
+        )}
       </View>
 
-      <Text style={styles.prayerDescription}>{item.description}</Text>
+      <Text style={styles.prayerMessage}>{item.message}</Text>
 
-      <View style={styles.prayerFooter}>
-        <Text style={styles.prayerAuthor}>
-          By {item.isAnonymous ? 'Anonymous' : item.author?.name || 'Unknown'}
-        </Text>
-        <View style={styles.prayerStats}>
-          <Ionicons name="heart" size={16} color="#ef4444" />
-          <Text style={styles.prayerCount}>{item.prayerCount || 0} prayers</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={styles.prayButton}
-        onPress={() => handlePray(item._id)}
-      >
-        <Ionicons name="heart-outline" size={20} color="#6366f1" />
-        <Text style={styles.prayButtonText}>Pray for this</Text>
-      </TouchableOpacity>
+      <Text style={styles.prayerDate}>
+        {new Date(item.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })}
+      </Text>
     </View>
   );
 
@@ -162,31 +157,22 @@ export default function PrayersScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Request Title"
-              value={title}
-              onChangeText={setTitle}
+              placeholder="Your Name (Optional)"
+              value={fromName}
+              onChangeText={setFromName}
               editable={!submitting}
             />
 
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Describe your prayer request..."
-              value={description}
-              onChangeText={setDescription}
+              value={message}
+              onChangeText={setMessage}
               multiline
-              numberOfLines={4}
+              numberOfLines={6}
               textAlignVertical="top"
               editable={!submitting}
             />
-
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>Submit Anonymously</Text>
-              <Switch
-                value={isAnonymous}
-                onValueChange={setIsAnonymous}
-                disabled={submitting}
-              />
-            </View>
 
             <TouchableOpacity
               style={[styles.submitButton, submitting && styles.buttonDisabled]}
@@ -232,64 +218,39 @@ const styles = StyleSheet.create({
   prayerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  prayerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
+  prayerHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  prayerBadge: {
-    backgroundColor: '#eef2ff',
+  prayerAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  answeredBadge: {
+    backgroundColor: '#d1fae5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
-  prayerBadgeText: {
+  answeredText: {
     fontSize: 12,
-    color: '#6366f1',
+    color: '#10b981',
     fontWeight: '600',
   },
-  prayerDescription: {
+  prayerMessage: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#1f2937',
     lineHeight: 20,
     marginBottom: 12,
   },
-  prayerFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  prayerAuthor: {
+  prayerDate: {
     fontSize: 12,
     color: '#9ca3af',
-  },
-  prayerStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  prayerCount: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  prayButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#eef2ff',
-    padding: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  prayButtonText: {
-    fontSize: 14,
-    color: '#6366f1',
-    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -350,18 +311,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   textArea: {
-    height: 100,
+    height: 120,
     textAlignVertical: 'top',
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: '#374151',
   },
   submitButton: {
     backgroundColor: '#6366f1',

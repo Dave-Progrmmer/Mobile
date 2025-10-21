@@ -1,3 +1,4 @@
+// app/(tabs)/index.tsx
 import { useState, useEffect } from 'react';
 import {
   View,
@@ -18,7 +19,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [announcements, setAnnouncements] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [latestSermon, setLatestSermon] = useState(null);
+  const [latestSermon, setLatestSermon] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -29,14 +30,14 @@ export default function HomeScreen() {
   const loadData = async () => {
     try {
       const [announcementsData, eventsData, sermonsData] = await Promise.all([
-        announcementsAPI.getAll(),
-        eventsAPI.getAll(),
-        sermonsAPI.getAll(),
+        announcementsAPI.getAll().catch(() => []),
+        eventsAPI.getAll().catch(() => []),
+        sermonsAPI.getAll().catch(() => []),
       ]);
 
-      setAnnouncements(announcementsData.announcements.slice(0, 3));
-      setUpcomingEvents(eventsData.events.slice(0, 3));
-      setLatestSermon(sermonsData.sermons[0]);
+      setAnnouncements(Array.isArray(announcementsData) ? announcementsData.slice(0, 3) : []);
+      setUpcomingEvents(Array.isArray(eventsData) ? eventsData.slice(0, 3) : []);
+      setLatestSermon(Array.isArray(sermonsData) && sermonsData.length > 0 ? sermonsData[0] : null);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -63,26 +64,24 @@ export default function HomeScreen() {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      {/* Welcome Section */}
       <View style={styles.welcomeSection}>
         <Text style={styles.welcomeText}>Welcome back,</Text>
         <Text style={styles.userName}>{user?.name || 'Member'}!</Text>
       </View>
 
-      {/* Quick Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => router.push('/prayers')}
+            onPress={() => router.push('/(tabs)/prayers')}
           >
             <Ionicons name="heart" size={32} color="#6366f1" />
             <Text style={styles.actionText}>Prayers</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => router.push('/events')}
+            onPress={() => router.push('/(tabs)/events')}
           >
             <Ionicons name="calendar" size={32} color="#6366f1" />
             <Text style={styles.actionText}>Events</Text>
@@ -97,7 +96,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Announcements */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Announcements</Text>
@@ -105,61 +103,60 @@ export default function HomeScreen() {
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
         </View>
-        {announcements.map((announcement: any) => (
-          <View key={announcement._id} style={styles.announcementCard}>
-            <Text style={styles.announcementTitle}>{announcement.title}</Text>
-            <Text style={styles.announcementContent} numberOfLines={2}>
-              {announcement.content}
-            </Text>
-            <Text style={styles.announcementDate}>
-              {new Date(announcement.createdAt).toLocaleDateString()}
-            </Text>
-          </View>
-        ))}
+        {announcements.length > 0 ? (
+          announcements.map((announcement: any) => (
+            <View key={announcement._id} style={styles.announcementCard}>
+              <Text style={styles.announcementTitle}>{announcement.title}</Text>
+              <Text style={styles.announcementContent} numberOfLines={2}>
+                {announcement.content}
+              </Text>
+              <Text style={styles.announcementDate}>
+                {new Date(announcement.createdAt || announcement.date).toLocaleDateString()}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No announcements yet</Text>
+        )}
       </View>
 
-      {/* Upcoming Events */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Upcoming Events</Text>
-          <TouchableOpacity onPress={() => router.push('/events')}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/events')}>
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
         </View>
-        {upcomingEvents.map((event: any) => (
-          <TouchableOpacity
-            key={event._id}
-            style={styles.eventCard}
-            onPress={() => router.push(`/events/${event._id}`)}
-          >
-            <View style={styles.eventIconContainer}>
-              <Ionicons name="calendar-outline" size={24} color="#6366f1" />
+        {upcomingEvents.length > 0 ? (
+          upcomingEvents.map((event: any) => (
+            <View key={event._id} style={styles.eventCard}>
+              <View style={styles.eventIconContainer}>
+                <Ionicons name="calendar-outline" size={24} color="#6366f1" />
+              </View>
+              <View style={styles.eventDetails}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                <Text style={styles.eventDate}>
+                  {new Date(event.startAt).toLocaleDateString()}
+                </Text>
+                <Text style={styles.eventLocation}>{event.location}</Text>
+              </View>
             </View>
-            <View style={styles.eventDetails}>
-              <Text style={styles.eventTitle}>{event.title}</Text>
-              <Text style={styles.eventDate}>
-                {new Date(event.date).toLocaleDateString()}
-              </Text>
-              <Text style={styles.eventLocation}>{event.location}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No upcoming events</Text>
+        )}
       </View>
 
-      {/* Latest Sermon */}
       {latestSermon && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Latest Sermon</Text>
-          <TouchableOpacity
-            style={styles.sermonCard}
-            onPress={() => router.push(`/sermons/${latestSermon._id}`)}
-          >
+          <View style={styles.sermonCard}>
             <Text style={styles.sermonTitle}>{latestSermon.title}</Text>
-            <Text style={styles.sermonPreacher}>By {latestSermon.preacher}</Text>
+            <Text style={styles.sermonPreacher}>By {latestSermon.speaker}</Text>
             <Text style={styles.sermonDate}>
-              {new Date(latestSermon.date).toLocaleDateString()}
+              {new Date(latestSermon.publishedAt).toLocaleDateString()}
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -324,5 +321,11 @@ const styles = StyleSheet.create({
   sermonDate: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    padding: 16,
   },
 });

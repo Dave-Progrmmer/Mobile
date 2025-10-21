@@ -1,3 +1,4 @@
+// app/quizzes.tsx
 import { useState, useEffect } from 'react';
 import {
   View,
@@ -21,8 +22,9 @@ export default function QuizzesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedQuiz, setSelectedQuiz] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [answers, setAnswers] = useState<{ [key: string]: number }>({});
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<any>(null);
 
   useEffect(() => {
     loadQuizzes();
@@ -31,7 +33,7 @@ export default function QuizzesScreen() {
   const loadQuizzes = async () => {
     try {
       const data = await quizzesAPI.getAll();
-      setQuizzes(data.quizzes);
+      setQuizzes(Array.isArray(data) ? data : []);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to load quizzes');
     } finally {
@@ -42,36 +44,33 @@ export default function QuizzesScreen() {
 
   const openQuiz = (quiz: any) => {
     setSelectedQuiz(quiz);
-    setAnswers({});
+    setSelectedAnswer(null);
+    setResult(null);
     setModalVisible(true);
   };
 
-  const selectAnswer = (questionIndex: number, optionIndex: number) => {
-    setAnswers({ ...answers, [questionIndex]: optionIndex });
-  };
-
   const handleSubmit = async () => {
-    if (!selectedQuiz) return;
-
-    const questionCount = selectedQuiz.questions?.length || 0;
-    if (Object.keys(answers).length < questionCount) {
-      Alert.alert('Incomplete', 'Please answer all questions before submitting');
+    if (!selectedQuiz || selectedAnswer === null) {
+      Alert.alert('Error', 'Please select an answer');
       return;
     }
 
     setSubmitting(true);
     try {
-      const result = await quizzesAPI.submitAnswer(selectedQuiz._id, answers);
-      Alert.alert(
-        'Quiz Submitted',
-        `Your score: ${result.score || 0}/${questionCount}`,
-        [{ text: 'OK', onPress: () => setModalVisible(false) }]
-      );
+      const response = await quizzesAPI.submitAnswer(selectedQuiz._id, selectedAnswer);
+      setResult(response);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to submit quiz');
+      Alert.alert('Error', error.message || 'Failed to submit answer');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedQuiz(null);
+    setSelectedAnswer(null);
+    setResult(null);
   };
 
   const renderQuiz = ({ item }: { item: any }) => (
@@ -83,15 +82,16 @@ export default function QuizzesScreen() {
         <Ionicons name="school" size={32} color="#6366f1" />
       </View>
       <View style={styles.quizContent}>
-        <Text style={styles.quizTitle}>{item.title}</Text>
-        <Text style={styles.quizDescription} numberOfLines={2}>
-          {item.description}
-        </Text>
-        <View style={styles.quizMeta}>
-          <Text style={styles.quizMetaText}>
-            {item.questions?.length || 0} questions
-          </Text>
-        </View>
+        <Text style={styles.quizQuestion}>{item.question}</Text>
+        {item.tags && item.tags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {item.tags.map((tag: string, index: number) => (
+              <View key={index} style={styles.tag}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
       <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
     </TouchableOpacity>
@@ -131,65 +131,96 @@ export default function QuizzesScreen() {
         <Modal
           visible={modalVisible}
           animationType="slide"
-          onRequestClose={() => setModalVisible(false)}
+          onRequestClose={closeModal}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedQuiz?.title}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Text style={styles.modalTitle}>Bible Quiz</Text>
+              <TouchableOpacity onPress={closeModal}>
                 <Ionicons name="close" size={28} color="#6b7280" />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalContent}>
-              <Text style={styles.modalDescription}>
-                {selectedQuiz?.description}
-              </Text>
+              {selectedQuiz && (
+                <View style={styles.questionCard}>
+                  <Text style={styles.questionText}>{selectedQuiz.question}</Text>
 
-              {selectedQuiz?.questions?.map((question: any, qIndex: number) => (
-                <View key={qIndex} style={styles.questionCard}>
-                  <Text style={styles.questionText}>
-                    {qIndex + 1}. {question.question}
-                  </Text>
-
-                  {question.options?.map((option: string, oIndex: number) => (
+                  {selectedQuiz.options?.map((option: string, index: number) => (
                     <TouchableOpacity
-                      key={oIndex}
+                      key={index}
                       style={[
                         styles.optionButton,
-                        answers[qIndex] === oIndex && styles.optionSelected,
+                        selectedAnswer === index && styles.optionSelected,
+                        result && result.correctIndex === index && styles.optionCorrect,
+                        result && selectedAnswer === index && !result.isCorrect && styles.optionWrong,
                       ]}
-                      onPress={() => selectAnswer(qIndex, oIndex)}
-                      disabled={submitting}
+                      onPress={() => !result && setSelectedAnswer(index)}
+                      disabled={!!result || submitting}
                     >
                       <View style={[
                         styles.radio,
-                        answers[qIndex] === oIndex && styles.radioSelected,
+                        selectedAnswer === index && styles.radioSelected,
                       ]}>
-                        {answers[qIndex] === oIndex && (
+                        {selectedAnswer === index && (
                           <View style={styles.radioInner} />
                         )}
                       </View>
                       <Text style={[
                         styles.optionText,
-                        answers[qIndex] === oIndex && styles.optionTextSelected,
+                        selectedAnswer === index && styles.optionTextSelected,
                       ]}>
                         {option}
                       </Text>
+                      {result && result.correctIndex === index && (
+                        <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+                      )}
                     </TouchableOpacity>
                   ))}
-                </View>
-              ))}
 
-              <TouchableOpacity
-                style={[styles.submitButton, submitting && styles.buttonDisabled]}
-                onPress={handleSubmit}
-                disabled={submitting}
-              >
-                <Text style={styles.submitButtonText}>
-                  {submitting ? 'Submitting...' : 'Submit Quiz'}
-                </Text>
-              </TouchableOpacity>
+                  {result && (
+                    <View style={[styles.resultCard, result.isCorrect ? styles.correctCard : styles.wrongCard]}>
+                      <View style={styles.resultHeader}>
+                        <Ionicons 
+                          name={result.isCorrect ? 'checkmark-circle' : 'close-circle'} 
+                          size={32} 
+                          color={result.isCorrect ? '#10b981' : '#ef4444'} 
+                        />
+                        <Text style={[styles.resultText, { color: result.isCorrect ? '#10b981' : '#ef4444' }]}>
+                          {result.isCorrect ? 'Correct!' : 'Incorrect'}
+                        </Text>
+                      </View>
+                      {result.explanation && (
+                        <Text style={styles.explanationText}>{result.explanation}</Text>
+                      )}
+                      <Text style={styles.correctAnswerText}>
+                        Correct Answer: {result.correctAnswer}
+                      </Text>
+                    </View>
+                  )}
+
+                  {!result && (
+                    <TouchableOpacity
+                      style={[styles.submitButton, (submitting || selectedAnswer === null) && styles.buttonDisabled]}
+                      onPress={handleSubmit}
+                      disabled={submitting || selectedAnswer === null}
+                    >
+                      <Text style={styles.submitButtonText}>
+                        {submitting ? 'Submitting...' : 'Submit Answer'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {result && (
+                    <TouchableOpacity
+                      style={styles.nextButton}
+                      onPress={closeModal}
+                    >
+                      <Text style={styles.nextButtonText}>Close</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </ScrollView>
           </View>
         </Modal>
@@ -236,23 +267,27 @@ const styles = StyleSheet.create({
   quizContent: {
     flex: 1,
   },
-  quizTitle: {
+  quizQuestion: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 4,
-  },
-  quizDescription: {
-    fontSize: 14,
-    color: '#6b7280',
     marginBottom: 8,
   },
-  quizMeta: {
+  tagsContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
-  quizMetaText: {
-    fontSize: 12,
-    color: '#9ca3af',
+  tag: {
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  tagText: {
+    fontSize: 11,
+    color: '#6366f1',
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -277,7 +312,6 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
   },
   modalTitle: {
-    flex: 1,
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
@@ -286,38 +320,39 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  modalDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
   questionCard: {
     backgroundColor: '#f9fafb',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
   },
   questionText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 16,
-    lineHeight: 22,
+    marginBottom: 20,
+    lineHeight: 26,
   },
   optionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 10,
     borderWidth: 2,
     borderColor: '#e5e7eb',
   },
   optionSelected: {
     borderColor: '#6366f1',
     backgroundColor: '#eef2ff',
+  },
+  optionCorrect: {
+    borderColor: '#10b981',
+    backgroundColor: '#d1fae5',
+  },
+  optionWrong: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fee2e2',
   },
   radio: {
     width: 20,
@@ -340,11 +375,43 @@ const styles = StyleSheet.create({
   },
   optionText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: '#374151',
   },
   optionTextSelected: {
     color: '#6366f1',
+    fontWeight: '600',
+  },
+  resultCard: {
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 8,
+  },
+  correctCard: {
+    backgroundColor: '#d1fae5',
+  },
+  wrongCard: {
+    backgroundColor: '#fee2e2',
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  resultText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  explanationText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  correctAnswerText: {
+    fontSize: 14,
+    color: '#1f2937',
     fontWeight: '600',
   },
   submitButton: {
@@ -352,14 +419,25 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: 20,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   submitButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  nextButton: {
+    backgroundColor: '#f3f4f6',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  nextButtonText: {
+    color: '#374151',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -1,3 +1,4 @@
+// services/api.ts
 const API_BASE_URL = 'https://sol-coral.vercel.app';
 
 // Helper function for API calls
@@ -25,14 +26,14 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 // Users/Auth APIs
 export const usersAPI = {
-  register: (data: { name: string; email: string; password: string; phone?: string }) =>
+  register: (data: { name: string; email: string; password: string; phoneNumber?: string }) =>
     apiCall('/api/users/register', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   
   login: (email: string, password: string) =>
-    apiCall<{ token: string; user: any }>('/api/users/login', {
+    apiCall<{ token: string; _id: string; name: string; email: string; role: string }>('/api/users/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
@@ -46,31 +47,19 @@ export const usersAPI = {
       body: JSON.stringify(data),
     }),
   
-  getAll: () =>
-    apiCall<{ users: any[] }>('/api/users'),
-  
-  getById: (id: string) =>
-    apiCall(`/api/users/${id}`),
-  
-  updateUser: (id: string, data: any) =>
-    apiCall(`/api/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  
-  deleteUser: (id: string) =>
-    apiCall(`/api/users/${id}`, { method: 'DELETE' }),
+  getAllUsers: () =>
+    apiCall('/api/users'),
 };
 
 // Announcements APIs
 export const announcementsAPI = {
   getAll: () =>
-    apiCall<{ announcements: any[] }>('/api/announcements'),
+    apiCall('/api/announcements'),
   
   getById: (id: string) =>
     apiCall(`/api/announcements/${id}`),
   
-  create: (data: { title: string; content: string; priority?: string }) =>
+  create: (data: { title: string; content: string; priority?: string; expiresAt?: string }) =>
     apiCall('/api/announcements', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -89,12 +78,12 @@ export const announcementsAPI = {
 // Events APIs
 export const eventsAPI = {
   getAll: () =>
-    apiCall<{ events: any[] }>('/api/events'),
+    apiCall('/api/events'),
   
   getById: (id: string) =>
     apiCall(`/api/events/${id}`),
   
-  create: (data: { title: string; description: string; date: string; location: string; type?: string }) =>
+  create: (data: { title: string; description: string; startAt: string; endAt?: string; location: string }) =>
     apiCall('/api/events', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -108,26 +97,17 @@ export const eventsAPI = {
   
   delete: (id: string) =>
     apiCall(`/api/events/${id}`, { method: 'DELETE' }),
-  
-  register: (id: string) =>
-    apiCall(`/api/events/${id}/register`, { method: 'POST' }),
-  
-  unregister: (id: string) =>
-    apiCall(`/api/events/${id}/unregister`, { method: 'POST' }),
-  
-  getRegistrations: (id: string) =>
-    apiCall(`/api/events/${id}/registrations`),
 };
 
-// Quizzes APIs
+// Quizzes APIs  
 export const quizzesAPI = {
   getAll: () =>
-    apiCall<{ quizzes: any[] }>('/api/quizzes'),
+    apiCall('/api/quizzes'),
   
   getById: (id: string) =>
     apiCall(`/api/quizzes/${id}`),
   
-  create: (data: { title: string; description: string; questions: any[] }) =>
+  create: (data: { question: string; options: string[]; correctIndex: number; explanation?: string; tags?: string[] }) =>
     apiCall('/api/quizzes', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -142,25 +122,22 @@ export const quizzesAPI = {
   delete: (id: string) =>
     apiCall(`/api/quizzes/${id}`, { method: 'DELETE' }),
   
-  submitAnswer: (id: string, answers: any) =>
+  submitAnswer: (id: string, selectedIndex: number) =>
     apiCall(`/api/quizzes/${id}/submit`, {
       method: 'POST',
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ selectedIndex }),
     }),
-  
-  getResults: (id: string) =>
-    apiCall(`/api/quizzes/${id}/results`),
 };
 
 // Sermons APIs
 export const sermonsAPI = {
   getAll: () =>
-    apiCall<{ sermons: any[] }>('/api/sermons'),
+    apiCall('/api/sermons'),
   
   getById: (id: string) =>
     apiCall(`/api/sermons/${id}`),
   
-  create: (data: { title: string; preacher: string; date: string; videoUrl?: string; audioUrl?: string; notes?: string }) =>
+  create: (data: { title: string; speaker: string; description?: string; mediaUrl: string; mediaType: 'video' | 'audio'; thumbnailUrl?: string; publishedAt?: string }) =>
     apiCall('/api/sermons', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -179,29 +156,23 @@ export const sermonsAPI = {
 // Prayer Requests APIs
 export const prayersAPI = {
   getAll: () =>
-    apiCall<{ prayers: any[] }>('/api/prayers'),
+    apiCall('/api/prayers'),
+  
+  getMyPrayers: () =>
+    apiCall('/api/prayers/my-prayers'),
   
   getById: (id: string) =>
     apiCall(`/api/prayers/${id}`),
   
-  create: (data: { title: string; description: string; isAnonymous?: boolean }) =>
+  create: (data: { message: string; fromName?: string }) =>
     apiCall('/api/prayers', {
       method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  
-  update: (id: string, data: any) =>
-    apiCall(`/api/prayers/${id}`, {
-      method: 'PUT',
       body: JSON.stringify(data),
     }),
   
   delete: (id: string) =>
     apiCall(`/api/prayers/${id}`, { method: 'DELETE' }),
   
-  addPrayer: (id: string) =>
-    apiCall(`/api/prayers/${id}/pray`, { method: 'POST' }),
-  
   markAsAnswered: (id: string) =>
-    apiCall(`/api/prayers/${id}/answered`, { method: 'PUT' }),
+    apiCall(`/api/prayers/${id}/answer`, { method: 'PUT' }),
 };

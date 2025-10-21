@@ -1,14 +1,14 @@
 // contexts/AuthContext.tsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext } from 'react';
 import { usersAPI } from '../services/api';
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
-  phone?: string;
+  phoneNumber?: string;
   role?: string;
-  photo?: string;
+  profileImage?: string;
 }
 
 interface AuthContextType {
@@ -16,14 +16,14 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+  register: (name: string, email: string, password: string, phoneNumber?: string) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Simple in-memory storage (replace with AsyncStorage in production)
+// Simple in-memory storage
 let storedToken: string | null = null;
 let storedUser: User | null = null;
 
@@ -35,7 +35,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await usersAPI.login(email, password);
-      const { token: newToken, user: newUser } = response;
+      const { token: newToken, ...userData } = response;
+      
+      const newUser: User = {
+        _id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+      };
       
       storedToken = newToken;
       storedUser = newUser;
@@ -47,10 +54,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string, phone?: string) => {
+  const register = async (name: string, email: string, password: string, phoneNumber?: string) => {
     try {
-      const response = await usersAPI.register({ name, email, password, phone });
-      const { token: newToken, user: newUser } = response;
+      const response = await usersAPI.register({ name, email, password, phoneNumber });
+      const { token: newToken, ...userData } = response;
+      
+      const newUser: User = {
+        _id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        phoneNumber,
+      };
       
       storedToken = newToken;
       storedUser = newUser;

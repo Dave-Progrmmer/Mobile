@@ -1,3 +1,4 @@
+// app/(tabs)/sermons.tsx
 import { useState, useEffect } from 'react';
 import {
   View,
@@ -25,7 +26,7 @@ export default function SermonsScreen() {
   const loadSermons = async () => {
     try {
       const data = await sermonsAPI.getAll();
-      setSermons(data.sermons);
+      setSermons(Array.isArray(data) ? data : []);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to load sermons');
     } finally {
@@ -48,13 +49,19 @@ export default function SermonsScreen() {
     <View style={styles.sermonCard}>
       <View style={styles.sermonHeader}>
         <View style={styles.iconContainer}>
-          <Ionicons name="book" size={24} color="#6366f1" />
+          <Ionicons 
+            name={item.mediaType === 'video' ? 'play-circle' : 'musical-notes'} 
+            size={24} 
+            color="#6366f1" 
+          />
         </View>
         <View style={styles.sermonHeaderText}>
           <Text style={styles.sermonTitle}>{item.title}</Text>
-          <Text style={styles.sermonPreacher}>By {item.preacher}</Text>
+          {item.speaker && (
+            <Text style={styles.sermonPreacher}>By {item.speaker}</Text>
+          )}
           <Text style={styles.sermonDate}>
-            {new Date(item.date).toLocaleDateString('en-US', {
+            {new Date(item.publishedAt || item.createdAt).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
               day: 'numeric',
@@ -63,32 +70,27 @@ export default function SermonsScreen() {
         </View>
       </View>
 
-      {item.notes && (
+      {item.description && (
         <Text style={styles.sermonNotes} numberOfLines={3}>
-          {item.notes}
+          {item.description}
         </Text>
       )}
 
-      <View style={styles.mediaButtons}>
-        {item.videoUrl && (
-          <TouchableOpacity
-            style={styles.mediaButton}
-            onPress={() => openMedia(item.videoUrl, 'Video')}
-          >
-            <Ionicons name="play-circle" size={20} color="#6366f1" />
-            <Text style={styles.mediaButtonText}>Watch Video</Text>
-          </TouchableOpacity>
-        )}
-        {item.audioUrl && (
-          <TouchableOpacity
-            style={styles.mediaButton}
-            onPress={() => openMedia(item.audioUrl, 'Audio')}
-          >
-            <Ionicons name="musical-notes" size={20} color="#6366f1" />
-            <Text style={styles.mediaButtonText}>Listen Audio</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {item.mediaUrl && (
+        <TouchableOpacity
+          style={styles.mediaButton}
+          onPress={() => openMedia(item.mediaUrl, item.mediaType === 'video' ? 'Video' : 'Audio')}
+        >
+          <Ionicons 
+            name={item.mediaType === 'video' ? 'play-circle' : 'musical-notes'} 
+            size={20} 
+            color="#6366f1" 
+          />
+          <Text style={styles.mediaButtonText}>
+            {item.mediaType === 'video' ? 'Watch Video' : 'Listen Audio'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -183,12 +185,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
-  mediaButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
   mediaButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

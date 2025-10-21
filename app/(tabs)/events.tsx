@@ -1,3 +1,4 @@
+// app/(tabs)/events.tsx
 import { useState, useEffect } from 'react';
 import {
   View,
@@ -9,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { eventsAPI } from '../../services/api';
 
@@ -17,7 +17,6 @@ export default function EventsScreen() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     loadEvents();
@@ -26,22 +25,12 @@ export default function EventsScreen() {
   const loadEvents = async () => {
     try {
       const data = await eventsAPI.getAll();
-      setEvents(data.events);
+      setEvents(Array.isArray(data) ? data : []);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to load events');
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  };
-
-  const handleRegister = async (eventId: string) => {
-    try {
-      await eventsAPI.register(eventId);
-      Alert.alert('Success', 'You have registered for this event!');
-      loadEvents();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to register');
     }
   };
 
@@ -53,19 +42,25 @@ export default function EventsScreen() {
         </View>
         <View style={styles.eventHeaderText}>
           <Text style={styles.eventTitle}>{item.title}</Text>
-          <Text style={styles.eventType}>{item.type || 'Event'}</Text>
+          {item.approved !== undefined && (
+            <Text style={[styles.eventStatus, { color: item.approved ? '#10b981' : '#f59e0b' }]}>
+              {item.approved ? 'Approved' : 'Pending Approval'}
+            </Text>
+          )}
         </View>
       </View>
 
-      <Text style={styles.eventDescription} numberOfLines={3}>
-        {item.description}
-      </Text>
+      {item.description && (
+        <Text style={styles.eventDescription} numberOfLines={3}>
+          {item.description}
+        </Text>
+      )}
 
       <View style={styles.eventInfo}>
         <View style={styles.infoRow}>
           <Ionicons name="time-outline" size={16} color="#6b7280" />
           <Text style={styles.infoText}>
-            {new Date(item.date).toLocaleDateString('en-US', {
+            {new Date(item.startAt).toLocaleDateString('en-US', {
               weekday: 'short',
               year: 'numeric',
               month: 'short',
@@ -73,25 +68,18 @@ export default function EventsScreen() {
             })}
           </Text>
         </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={16} color="#6b7280" />
-          <Text style={styles.infoText}>{item.location}</Text>
-        </View>
-      </View>
-
-      <View style={styles.eventActions}>
-        <TouchableOpacity
-          style={styles.registerButton}
-          onPress={() => handleRegister(item._id)}
-        >
-          <Text style={styles.registerButtonText}>Register</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.detailsButton}
-          onPress={() => router.push(`/event-details/${item._id}`)}
-        >
-          <Text style={styles.detailsButtonText}>View Details</Text>
-        </TouchableOpacity>
+        {item.location && (
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={16} color="#6b7280" />
+            <Text style={styles.infoText}>{item.location}</Text>
+          </View>
+        )}
+        {item.createdBy && (
+          <View style={styles.infoRow}>
+            <Ionicons name="person-outline" size={16} color="#6b7280" />
+            <Text style={styles.infoText}>By {item.createdBy.name || 'Admin'}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -171,9 +159,8 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 4,
   },
-  eventType: {
+  eventStatus: {
     fontSize: 12,
-    color: '#6366f1',
     fontWeight: '600',
     textTransform: 'uppercase',
   },
@@ -184,7 +171,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   eventInfo: {
-    marginBottom: 12,
+    gap: 6,
   },
   infoRow: {
     flexDirection: 'row',
@@ -195,34 +182,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     marginLeft: 8,
-  },
-  eventActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  registerButton: {
-    flex: 1,
-    backgroundColor: '#6366f1',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  registerButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  detailsButton: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  detailsButtonText: {
-    color: '#374151',
-    fontSize: 14,
-    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',

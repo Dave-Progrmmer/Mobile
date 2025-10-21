@@ -1,3 +1,4 @@
+// app/announcements.tsx
 import { useState, useEffect } from 'react';
 import {
   View,
@@ -24,7 +25,7 @@ export default function AnnouncementsScreen() {
   const loadAnnouncements = async () => {
     try {
       const data = await announcementsAPI.getAll();
-      setAnnouncements(data.announcements);
+      setAnnouncements(Array.isArray(data) ? data : []);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to load announcements');
     } finally {
@@ -55,17 +56,23 @@ export default function AnnouncementsScreen() {
           </Text>
         </View>
         <Text style={styles.date}>
-          {new Date(item.createdAt).toLocaleDateString()}
+          {new Date(item.createdAt || item.date).toLocaleDateString()}
         </Text>
       </View>
 
       <Text style={styles.title}>{item.title}</Text>
       <Text style={styles.content}>{item.content}</Text>
 
-      {item.author && (
+      {item.createdBy && (
         <View style={styles.footer}>
           <Ionicons name="person-circle-outline" size={16} color="#9ca3af" />
-          <Text style={styles.author}>Posted by {item.author.name}</Text>
+          <Text style={styles.author}>Posted by {item.createdBy.name || 'Admin'}</Text>
+        </View>
+      )}
+
+      {!item.isActive && (
+        <View style={styles.inactiveBadge}>
+          <Text style={styles.inactiveText}>Inactive</Text>
         </View>
       )}
     </View>
@@ -170,6 +177,19 @@ const styles = StyleSheet.create({
   author: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  inactiveBadge: {
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#fee2e2',
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  inactiveText: {
+    fontSize: 12,
+    color: '#ef4444',
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
